@@ -1,0 +1,95 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: ${env:ORG}
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: anslagstavla
+
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: eu-north-1
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: 
+            - arn:aws:dynamodb:eu-north-1:${env:AWS_ACCOUNT_ID}:table/messages
+            - arn:aws:dynamodb:eu-north-1:${env:AWS_ACCOUNT_ID}:table/messages/index/username-index
+            - arn:aws:dynamodb:eu-north-1:${env:AWS_ACCOUNT_ID}:table/messages/index/createdAt-index
+package:
+  include:
+    - node_modules/**
+
+functions:
+  postMessage:
+    handler: functions/postMessage/index.handler
+    events:
+      - httpApi: 
+          path: /message
+          method: post
+  deleteMessage:
+    handler: functions/deleteMessage/index.handler
+    events:
+      - httpApi:
+          path: /message/{id}
+          method: delete
+  getMessages:
+    handler: functions/getMessages/index.handler
+    events:
+      - httpApi: 
+          path: /getMessages
+          method: get
+
+  getMessagesByUsername:
+    handler: functions/getMessagesByUsername/index.handler
+    events:
+      - httpApi: 
+          path: /getMessagesByUsername
+          method: get        
+
+  updateMessage:
+    handler: functions/updateMessage/index.handler
+    events:
+      - httpApi: 
+          path: /updateMessage
+          method: put
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${env:TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: username
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: username-index
+            KeySchema:
+              - AttributeName: username
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: createdAt-index
+            KeySchema:
+              - AttributeName: id
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
